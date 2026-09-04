@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local User Database</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="auth-page">
+    <main class="card" id="adminLogin">
+        <h1>Local User Database</h1>
+        <p>This browser-only view lists accounts saved in this browser. Passwords are never displayed.</p>
+        <form class="auth-form" id="adminForm">
+            <label for="adminPassword">Admin password</label>
+            <input type="password" id="adminPassword" required>
+            <button class="btn" type="submit">Open Database</button>
+        </form>
+    </main>
+
+    <main class="card" id="databaseView" style="display: none;">
+        <h1>Saved Users</h1>
+        <p id="databaseNote"></p>
+        <div style="overflow-x: auto;">
+            <table id="usersTable" style="width: 100%; border-collapse: collapse; text-align: left;">
+                <thead><tr><th style="padding: 8px;">Username</th><th style="padding: 8px;">Status</th><th style="padding: 8px;">Last login</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <p><a href="index.html">Back to File Drop</a></p>
+    </main>
+    <script src="database.js"></script>
+</body>
+</html>
