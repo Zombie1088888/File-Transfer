@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P File & Folder Drop</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style media="not all">
+        * { box-sizing: border-box; }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f0f2f5;
+            color: #1c1e21;
+            max-width: 650px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+        .auth-screen { max-width: 430px; margin: 10vh auto 0; }
+        .auth-screen h1 { text-align: center; }
+        .auth-copy { color: #555; line-height: 1.5; }
+        .auth-form { display: grid; gap: 0.8rem; }
+        .auth-form input[type="text"], .auth-form input[type="password"] {
+            width: 100%;
+            letter-spacing: normal;
+            text-align: left;
+            font-size: 1rem;
+        }
+        .auth-toggle { text-align: center; color: #1a73e8; cursor: pointer; margin: 0.25rem 0 0; }
+        .card {
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 1.25rem;
+        }
+        h1 { margin-top: 0; color: #1a73e8; font-size: 1.8rem; }
+        h3 { margin-top: 0; color: #333; font-size: 1.1rem; }
+        .username-display {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: #1a73e8;
+            letter-spacing: 1px;
+            margin: 10px 0;
+            text-align: center;
+            background: #e8f0fe;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .input-group { margin-bottom: 1rem; }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.4rem;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            background: #f8f9fa;
+            border: 1px dashed #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        input[type="text"] {
+            font-size: 1.3rem;
+            padding: 0.6rem;
+            width: 160px;
+            letter-spacing: 4px;
+            text-align: center;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            outline: none;
+        }
+        input[type="text"]:focus { border-color: #1a73e8; }
+        .btn {
+            background: #1a73e8;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.6rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+        .btn:hover { background: #1557b0; }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { background: #a8c7fa; cursor: not-allowed; }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .tab-btn.active {
+            background: #1a73e8;
+            color: white;
+            border-color: #1a73e8;
+        }
+        .log-box {
+            background: #1e1e1e;
+            color: #4ec9b0;
+            padding: 1rem;
+            border-radius: 6px;
+            height: 180px;
+            overflow-y: auto;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+        .log-entry { margin: 4px 0; border-bottom: 1px solid #2d2d2d; padding-bottom: 3px; }
+        .log-entry.error { color: #f48771; }
+        .log-entry.success { color: #b5cea8; }
+        .message-box {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            min-height: 90px;
+            max-height: 180px;
+            overflow-y: auto;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+        .message-entry { margin: 0.35rem 0; }
+        .message-entry strong { color: #1a73e8; }
+        .history-list { margin: 0; padding-left: 1.2rem; color: #444; }
+        .history-list li { margin: 0.35rem 0; overflow-wrap: anywhere; }
+        .history-empty { color: #777; margin: 0; }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-online { background: #e6f4ea; color: #137333; }
+        .status-offline { background: #fce8e6; color: #c5221f; }
+    </style>
+</head>
+<body>
+
+    <main id="app">
+        <div class="card">
+            <h1>P2P File & Folder Transfer</h1>
+            <p>Your username: <span id="statusBadge" class="status-badge status-offline">Connecting...</span></p>
+            <div class="username-display" id="myUsername"></div>
+            <button class="btn" id="signOutBtn" type="button">Sign Out</button>
+        </div>
+
+    <div class="card">
+        <h3>1. Select Files or Folders to Send</h3>
+        
+        <div class="tab-buttons">
+            <button class="tab-btn active" id="tabFilesBtn" onclick="switchMode('files')">📄 Select File(s)</button>
+            <button class="tab-btn" id="tabFolderBtn" onclick="switchMode('folder')">📁 Add Folder(s)</button>
+        </div>
+
+        <div class="input-group" id="fileGroup">
+            <label for="fileInput">Choose standard files:</label>
+            <input type="file" id="fileInput" multiple>
+        </div>
+
+        <div class="input-group" id="folderGroup" style="display: none;">
+            <label for="folderInput">Choose folders one at a time; each selection is added below:</label>
+            <input type="file" id="folderInput" webkitdirectory directory multiple>
+            <p id="folderSummary"></p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>2. Send to Remote Username</h3>
+        <p>Enter the receiver's username:</p>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="peerUsername" placeholder="username" maxlength="24" style="letter-spacing: normal; text-align: left; width: 220px;">
+            <button class="btn" id="sendBtn">Send Now</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>3. Send a Message</h3>
+        <div class="message-box" id="messageBox"><p style="color: #777; margin: 0;">No messages yet.</p></div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="messageInput" placeholder="Write a message..." maxlength="1000" style="letter-spacing: normal; text-align: left; width: 100%;">
+            <button class="btn" id="messageBtn" type="button">Send</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Transfer History</h3>
+        <p><strong>Files sent</strong></p>
+        <ul class="history-list" id="sentHistory"><li class="history-empty">Nothing sent yet.</li></ul>
+        <p><strong>Files downloaded</strong></p>
+        <ul class="history-list" id="downloadHistory"><li class="history-empty">Nothing downloaded yet.</li></ul>
+    </div>
+
+    <div class="card">
+        <h3>Receiving</h3>
+        <p id="receivingStatus">Incoming file transfers are enabled.</p>
+        <button class="btn" id="toggleReceivingBtn" type="button">Stop Receiving Files</button>
+    </div>
+
+    <div class="card">
+        <h3>Activity Log</h3>
+        <div class="log-box" id="statusLog"></div>
+    </div>
+    </main>
+
+    <script type="text/plain">
+        let currentMode = 'files';
+        let currentUser = null;
+        let peer = null;
+        let selectedFolderFiles = [];
+        let receivingFiles = true;
+        const APP_PREFIX = 'p2p-folder-drop-user-v3-';
+
+        const savedUser = localStorage.getItem('p2p_current_user');
+        const savedUsers = JSON.parse(localStorage.getItem('p2p_users') || '{}');
+        if (!savedUser || !savedUsers[savedUser.toLowerCase()]) {
+            window.location.href = 'signin.html';
+        } else {
+            currentUser = savedUsers[savedUser.toLowerCase()].username;
+        }
+
+        document.getElementById('signOutBtn').addEventListener('click', () => {
+            if (peer) peer.destroy();
+            localStorage.removeItem('p2p_current_user');
+            window.location.href = 'signin.html';
+        });
+
+        function switchMode(mode) {
+            currentMode = mode;
+            document.getElementById('tabFilesBtn').classList.toggle('active', mode === 'files');
+            document.getElementById('tabFolderBtn').classList.toggle('active', mode === 'folder');
+            document.getElementById('fileGroup').style.display = mode === 'files' ? 'block' : 'none';
+            document.getElementById('folderGroup').style.display = mode === 'folder' ? 'block' : 'none';
+        }
+
+        document.getElementById('folderInput').addEventListener('change', (event) => {
+            const newFiles = Array.from(event.target.files);
+            selectedFolderFiles.push(...newFiles);
+            const folderNames = [...new Set(selectedFolderFiles.map(file => file.webkitRelativePath.split('/')[0]))];
+            document.getElementById('folderSummary').textContent = `${folderNames.length} folder(s), ${selectedFolderFiles.length} file(s) selected`;
+            event.target.value = '';
+        });
+
+        // --- Logging helper ---
+        function log(message, type = 'normal') {
+            const logBox = document.getElementById('statusLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logBox.appendChild(entry);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function peerIdFor(username) {
+            return APP_PREFIX + username.toLowerCase();
+        }
+
+        function historyKey() {
+            return `p2p_transfer_history_${currentUser.toLowerCase()}`;
+        }
+
+        function addHistory(kind, filename, username) {
+            const history = JSON.parse(localStorage.getItem(historyKey()) || '{"sent":[],"downloaded":[]}');
+            history[kind].unshift({ filename, username, time: new Date().toLocaleString() });
+            history[kind] = history[kind].slice(0, 50);
+            localStorage.setItem(historyKey(), JSON.stringify(history));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            const history = JSON.parse(localStorage.getItem(historyKey()) || '{"sent":[],"downloaded":[]}');
+            const lists = [
+                ['sentHistory', history.sent, 'to'],
+                ['downloadHistory', history.downloaded, 'from']
+            ];
+            lists.forEach(([id, entries, direction]) => {
+                const list = document.getElementById(id);
+                list.replaceChildren();
+                if (!entries.length) {
+                    const empty = document.createElement('li');
+                    empty.className = 'history-empty';
+                    empty.textContent = direction === 'to' ? 'Nothing sent yet.' : 'Nothing downloaded yet.';
+                    list.appendChild(empty);
+                    return;
+                }
+                entries.forEach((entry) => {
+                    const item = document.createElement('li');
+                    item.textContent = `${entry.filename} (${direction} ${entry.username}) - ${entry.time}`;
+                    list.appendChild(item);
+                });
+            });
+        }
+
+        function startPeer() {
+            document.getElementById('myUsername').innerText = currentUser;
+            renderHistory();
+            receivingFiles = localStorage.getItem(`p2p_receiving_${currentUser.toLowerCase()}`) !== 'false';
+            updateReceivingButton();
+            peer = new Peer(peerIdFor(currentUser));
+
+            peer.on('open', () => {
+                const badge = document.getElementById('statusBadge');
+                badge.textContent = 'Ready';
+                badge.className = 'status-badge status-online';
+                log(`System online. Ready to send and receive as ${currentUser}`);
+            });
+
+            peer.on('error', (err) => log(`Peer Error: ${err.message}`, 'error'));
+
+            peer.on('connection', (conn) => {
+            log(`Incoming connection established from peer...`, 'success');
+            
+            conn.on('data', (data) => {
+                if (data && data.type === 'message') {
+                    addMessage(data.sender || 'Peer', data.text);
+                    log(`Message received from ${data.sender || 'peer'}`, 'success');
+                } else if (data && data.file && data.filename) {
+                    if (!receivingFiles) {
+                        log(`Rejected incoming file "${data.filename}" because receiving is disabled.`, 'error');
+                        conn.close();
+                        return;
+                    }
+                    log(`Receiving ${data.isZip ? 'folder archive' : 'file'}: "${data.filename}"...`);
+                    
+                    // Create blob and trigger automatic save/download
+                    const blob = new Blob([data.file], { type: data.filetype || 'application/octet-stream' });
+                    const url = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = data.filename;
+                    a.style.display = 'none';
+                    document.body.appendChild(a);
+                    a.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 200);
+
+                    log(`Successfully downloaded: ${data.filename}`, 'success');
+                    addHistory('downloaded', data.filename, data.sender || 'peer');
+                }
+            });
+            });
+        }
+
+        function addMessage(sender, text) {
+            const messageBox = document.getElementById('messageBox');
+            const emptyMessage = messageBox.querySelector('p');
+            if (emptyMessage) emptyMessage.remove();
+            const entry = document.createElement('div');
+            entry.className = 'message-entry';
+            const senderLabel = document.createElement('strong');
+            senderLabel.textContent = `${sender}: `;
+            entry.append(senderLabel, document.createTextNode(text));
+            messageBox.appendChild(entry);
+            messageBox.scrollTop = messageBox.scrollHeight;
+        }
+
+        function sendMessage() {
+            const recipient = document.getElementById('peerUsername').value.trim();
+            const messageInput = document.getElementById('messageInput');
+            const text = messageInput.value.trim();
+            if (!/^[a-zA-Z0-9_-]{3,24}$/.test(recipient)) {
+                alert('Enter the receiver username above first.');
+                return;
+            }
+            if (!text) return;
+
+            const messageConnection = peer.connect(peerIdFor(recipient), { reliable: true });
+            messageConnection.on('open', () => {
+                messageConnection.send({ type: 'message', sender: currentUser, text });
+                addMessage('You', text);
+                log(`Message sent to ${recipient}`, 'success');
+                messageInput.value = '';
+            });
+            messageConnection.on('error', (error) => log(`Message error: ${error.message}`, 'error'));
+        }
+
+        document.getElementById('messageBtn').addEventListener('click', sendMessage);
+        document.getElementById('messageInput').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') sendMessage();
+        });
+
+        function updateReceivingButton() {
+            document.getElementById('receivingStatus').textContent = receivingFiles
+                ? 'Incoming file transfers are enabled.'
+                : 'Incoming file transfers are disabled. Messages are still available.';
+            document.getElementById('toggleReceivingBtn').textContent = receivingFiles
+                ? 'Stop Receiving Files'
+                : 'Start Receiving Files';
+        }
+
+        document.getElementById('toggleReceivingBtn').addEventListener('click', () => {
+            receivingFiles = !receivingFiles;
+            localStorage.setItem(`p2p_receiving_${currentUser.toLowerCase()}`, receivingFiles);
+            updateReceivingButton();
+            log(receivingFiles ? 'Incoming file transfers enabled.' : 'Incoming file transfers disabled.');
+        });
+
+        if (currentUser) {
+            startPeer();
+        }
+
+        // --- Sending Handlers ---
+        document.getElementById('sendBtn').addEventListener('click', async () => {
+            const peerUsername = document.getElementById('peerUsername').value.trim();
+            const fileInput = document.getElementById('fileInput');
+            const folderInput = document.getElementById('folderInput');
+
+            if (!/^[a-zA-Z0-9_-]{3,24}$/.test(peerUsername)) {
+                alert('Please enter a valid username.');
+                return;
+            }
+
+            let filesToSend = [];
+            let isFolder = (currentMode === 'folder');
+
+            if (isFolder) {
+                filesToSend = selectedFolderFiles;
+            } else {
+                filesToSend = Array.from(fileInput.files);
+            }
+
+            if (filesToSend.length === 0) {
+                alert(`Please select ${isFolder ? 'a folder' : 'at least one file'} first.`);
+                return;
+            }
+
+            const sendBtn = document.getElementById('sendBtn');
+            sendBtn.disabled = true;
+
+            const targetId = peerIdFor(peerUsername);
+            log(`Connecting to receiver (${peerUsername})...`);
+
+            try {
+                if (isFolder || filesToSend.length > 1) {
+                    // Package into ZIP if it's a folder or multiple files
+                    log(`Compressing ${filesToSend.length} item(s) into a .zip archive...`);
+                    const zip = new JSZip();
+
+                    // Determine folder top-level name if applicable
+                    let zipName = 'files_bundle.zip';
+                    if (isFolder) zipName = 'folders_bundle.zip';
+
+                    for (const file of filesToSend) {
+                        const path = file.webkitRelativePath || file.name;
+                        zip.file(path, file);
+                    }
+
+                    const zipBlob = await zip.generateAsync({ type: "blob" }, (metadata) => {
+                        if (metadata.percent % 25 === 0) {
+                            log(`Compression progress: ${metadata.percent.toFixed(0)}%`);
+                        }
+                    });
+
+                    log(`Compression complete (${(zipBlob.size / (1024 * 1024)).toFixed(2)} MB). Sending...`);
+                    sendDataToPeer(targetId, zipName, zipBlob, 'application/zip', true);
+
+                } else {
+                    // Single file transfer
+                    const singleFile = filesToSend[0];
+                    log(`Preparing single file: "${singleFile.name}" (${(singleFile.size / 1024).toFixed(1)} KB)...`);
+                    sendDataToPeer(targetId, singleFile.name, singleFile, singleFile.type, false);
+                }
+            } catch (err) {
+                log(`Failed to process files: ${err.message}`, 'error');
+                sendBtn.disabled = false;
+            }
+        });
+
+        function sendDataToPeer(targetId, filename, blobOrFile, filetype, isZip) {
+            const sendBtn = document.getElementById('sendBtn');
+            const conn = peer.connect(targetId, { reliable: true });
+
+            conn.on('open', () => {
+                log(`Connected! Transferring "${filename}"...`, 'success');
+                conn.send({
+                    filename: filename,
+                    filetype: filetype,
+                    file: blobOrFile,
+                    isZip: isZip,
+                    sender: currentUser
+                });
+                
+                log(`Transfer finished for "${filename}"!`, 'success');
+                addHistory('sent', filename, targetId.replace(APP_PREFIX, ''));
+                sendBtn.disabled = false;
+            });
+
+            conn.on('error', (err) => {
+                log(`Connection error: ${err.message}`, 'error');
+                sendBtn.disabled = false;
+            });
+
+            // Timeout check
+            setTimeout(() => {
+                if (!conn.open) {
+                    log(`Connection timed out. Check if receiver username ${targetId.replace(APP_PREFIX, '')} is online.`, 'error');
+                    sendBtn.disabled = false;
+                }
+            }, 10000);
+        }
+    </script>
+    <script src="app.js"></script>
+</body>
+</html>
